@@ -7,6 +7,13 @@
 using namespace std;
 using namespace cv;
 
+#define MAX_FRAME 2 //8
+
+string getFilePath(int frame_number)
+{
+	return "./images/ZED_image" + to_string(frame_number) +".png";
+}
+
 void splitIntoTwo(const Mat src, Mat& left, Mat& right)
 {
 	int half_width = src.cols / 2;
@@ -19,73 +26,78 @@ void splitIntoTwo(const Mat src, Mat& left, Mat& right)
 
 int main()
 {
+	int frame_number = 1;
+
 	//preprocessing
-	Mat src1, src2, dst;
-	src1 = imread("./images/ZED_image1.png", IMREAD_GRAYSCALE);
-	src2 = imread("./images/ZED_image2.png", IMREAD_GRAYSCALE);
-	
-	Mat src1_l, src1_r, src2_l, src2_r;
-	splitIntoTwo(src1, src1_l, src1_r);
-	splitIntoTwo(src2, src2_l, src2_r);
+	Mat img_current, img_current_l, img_current_r;
+	img_current = imread(getFilePath(frame_number), IMREAD_GRAYSCALE);
+    splitIntoTwo(img_current, img_current_l, img_current_r);
 	
 	//find keypoints from src1
-	vector<KeyPoint> kp1_l, kp1_r;
-	Mat desc1_l, desc1_r;
+	vector<KeyPoint> kp_current_l, kp_current_r;
+	Mat desc_current_l, desc_current_r;
 	Ptr<ORB> detector = ORB::create();
-	detector->detectAndCompute(src1_l, noArray(), kp1_l, desc1_l);
-	detector->detectAndCompute(src1_r, noArray(), kp1_r, desc1_r);
+	detector->detectAndCompute(img_current_l, noArray(), kp_current_l, desc_current_l);
+	detector->detectAndCompute(img_current_r, noArray(), kp_current_r, desc_current_r);
 
 	const float ratio_thresh = 0.8f;
 	vector<DMatch> good_matches;
 	vector<vector<DMatch>> knn_matches;
 	FeatureMatcher featureMacher = FeatureMatcher(ratio_thresh);
 	
-	featureMacher.matchFeature(desc1_l, desc1_r, knn_matches, good_matches);
+	featureMacher.matchFeature(desc_current_l, desc_current_r, knn_matches, good_matches);
 
 	//track keypoints between src1 and src2
-	vector<Point2f> pts1_l, pts2_l;
+	Mat img_next, img_next_l, img_next_r;
+
+	vector<Point2f> pts_current_l, pts_next_l;
 	vector<uchar> status;
 	vector<float> err;
-	KeyPoint::convert(kp1_l, pts1_l);
-	FeatureTracker tracker = FeatureTracker();
-	tracker.trackFeature(src1_l, src2_l, pts1_l, pts2_l, status, err);
-	
-	/*
-	for (int i = 0; i < pts1_l.size(); i++)
-	{
-		arrowedLine(src2_l, pts1_l[i], pts2_l[i], Scalar(0, 0, 255));
-	}*/
 
 	double focal = 350;
 	Point2d pp(336, 336);
 	Mat E, R, t, mask;
-	E = findEssentialMat(pts1_l, pts2_l, focal, pp, RANSAC, 0.999, 1.0, mask);
-	recoverPose(E, pts1_l, pts2_l, R, t, focal, pp, mask);
 
-	cout << R << endl;
-	cout << t << endl;
+	vector<KeyPoint> kp_next_l, kp_next_r;
+	Mat desc_next_l, desc_next_r;
 
-	//find keypoints from src2
-	vector<KeyPoint> kp2_l, kp2_r;
-	Mat desc2_l, desc2_r;
-	for (int i = 0; i < pts2_l.size(); i++)
+	Mat dst;
+
+	while (frame_number < MAX_FRAME)
 	{
-		kp2_l.push_back(KeyPoint(pts2_l[i], 1.f));
+		frame_number++;
+
+		img_next = imread(getFilePath(frame_number), IMREAD_GRAYSCALE);
+		splitIntoTwo(img_next, img_next_l, img_next_r);
+
+		KeyPoint::convert(kp_current_l, pts_current_l);
+		FeatureTracker tracker = FeatureTracker();
+		tracker.trackFeature(img_current_l, img_next_l, pts_current_l, pts_next_l, status, err);
+
+		E = findEssentialMat(pts_next_l, pts_current_l, focal, pp, RANSAC, 0.999, 1.0, mask);
+		recoverPose(E, pts_next_l, pts_current_l, R, t, focal, pp, mask);
+		cout << R << endl;
+		cout << t << endl;
+
+		for (int i = 0; i < pts_next_l.size(); i++)
+		{
+			kp_next_l.push_back(KeyPoint(pts_next_l[i], 1.f));
+		}
+		detector->compute(img_next_l, kp_next_l, desc_next_l);
+		detector->detectAndCompute(img_next_r, noArray(), kp_next_r, desc_next_r);
+
+		knn_matches.clear();
+		good_matches.clear();
+
+		featureMacher.matchFeature(desc_next_l, desc_next_r, knn_matches, good_matches);
+
+		drawMatches(img_next_l, kp_next_l, img_next_r, kp_next_r, good_matches, dst, Scalar::all(-1),
+			Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+
+		imshow("image", dst);
+		waitKey();
 	}
-	detector->compute(src2_l, kp2_l, desc2_l);
-	detector->detectAndCompute(src2_r, noArray(), kp2_r, desc2_r);
-
-	knn_matches.clear();
-	good_matches.clear();
-
-	featureMacher.matchFeature(desc2_l, desc2_r, knn_matches, good_matches);
-	
-	drawMatches(src2_l, kp2_l, src2_r, kp2_r, good_matches, dst, Scalar::all(-1),
-		Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-	
-
-	imshow("image", dst);
-	waitKey();
 
 	return 0;
 }
