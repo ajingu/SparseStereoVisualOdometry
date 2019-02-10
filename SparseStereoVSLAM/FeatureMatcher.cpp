@@ -6,8 +6,11 @@ FeatureMatcher::FeatureMatcher(const float ratio_thresh)
 	this->ratio_thresh = ratio_thresh;
 }
 
-void FeatureMatcher::matchFeature(Mat& descriptors1, Mat& descriptors2, vector<vector<DMatch>>& knn_matches, vector<DMatch>& good_matches)
+void FeatureMatcher::knnMatch(Mat& descriptors1, Mat& descriptors2, vector<vector<DMatch>>& knn_matches, vector<DMatch>& good_matches)
 {
+	knn_matches.clear();
+	good_matches.clear();
+
 	matcher.knnMatch(descriptors1, descriptors2, knn_matches, 2);
 
 	for (int i = 0; i < knn_matches.size(); i++)

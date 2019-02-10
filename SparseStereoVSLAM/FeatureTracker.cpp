@@ -2,6 +2,10 @@
 
 void FeatureTracker::trackFeature(Mat image1, Mat image2, vector<Point2f>& points1, vector<Point2f>& points2, vector<uchar>& status, vector<float>& err)
 {
+	points2.clear();
+	status.clear();
+	err.clear();
+
 	calcOpticalFlowPyrLK(image1, image2, points1, points2, status, err);
 
 	int indexCorrection = 0;

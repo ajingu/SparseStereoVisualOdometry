@@ -14,5 +14,5 @@ private:
 
 public:
 	FeatureMatcher(const float ratio_thresh);
-	void matchFeature(Mat& descriptors1, Mat& descriptors2, vector<vector<DMatch>>& knn_matches, vector<DMatch>& good_matches);
+	void knnMatch(Mat& descriptors1, Mat& descriptors2, vector<vector<DMatch>>& knn_matches, vector<DMatch>& good_matches);
 };
