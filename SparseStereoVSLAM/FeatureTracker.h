@@ -9,5 +9,5 @@ using namespace cv;
 class FeatureTracker
 {
 public:
-	void trackFeature(Mat image1, Mat image2, vector<Point2f>& points1, vector<Point2f>& points2, vector<uchar>& status, vector<float>& err);
+	void trackFeature(Mat image1, Mat image2, vector<Point2f>& points1, vector<Point2f>& points2, vector<uchar>& status);
 };
