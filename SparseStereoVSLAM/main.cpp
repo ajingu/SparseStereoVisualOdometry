@@ -75,20 +75,6 @@ int main()
 
 	//match features between current left image and current right image
 	matcher.knnMatch(kp_current_l, kp_current_r, desc_current_l, desc_current_r, knn_matches_current, good_matches_current);
-	/*
-	drawMatches(img_current_l, kp_current_l, img_current_r, kp_current_r, good_matches_current, dst, Scalar::all(-1),
-		Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-	
-	for (int i = 0; i < good_matches_current.size(); i++)
-	{
-		DMatch match = good_matches_current[i];
-		Point3f p = calcWordlCoord(kp_current_l[match.queryIdx].pt, kp_current_r[match.trainIdx].pt, focal, baseline);
-		cout << "z:" << p.z << endl;
-	}
-
-	imshow("image", dst);
-	waitKey();
-	*/
 
 
 	while (frame_number < MAX_FRAME)
