@@ -7,20 +7,20 @@
 using namespace std;
 using namespace cv;
 
-#define MAX_FRAME 2 //8
+#define MAX_FRAME 3 //8
 
 
 Point3f calcWordlCoord(Point2f& p_left, Point2f& p_right, float focal , float baseline)
 {
-	Point3f p;
-
 	float disparity = p_left.x - p_right.x;
 
-	p.x = focal * baseline / disparity;
-	p.y = p_left.x * baseline / disparity;
-	p.z = p_left.y * baseline / disparity;
-	
-	return p;
+	Point3f p_world;
+
+	p_world.x = p_left.x * baseline / disparity;
+	p_world.y = p_left.y * baseline / disparity;
+	p_world.z = focal * baseline / disparity;
+
+	return p_world;
 }
 
 string getFilePath(int frame_number)
@@ -53,15 +53,15 @@ int main()
 
 	vector<Point2f> pts_current_l, pts_next_l;
 	vector<uchar> status;
-	vector<float> err;
 	FeatureTracker tracker = FeatureTracker();
 
 	Mat E, R, t, mask;
-	const float focal = 350;
-	const Point2d pp(336, 336);
+	const float focal = 350; //pixel
+	const Point2d pp(336, 188);
 	const float baseline = 0.12f;
 
-	float absoluteDistance = 0.0f;
+	vector<double> distances;
+	double absoluteDistance = 0.0;
 
 
 	//preprocessing
@@ -74,7 +74,21 @@ int main()
 	KeyPoint::convert(kp_current_l, pts_current_l);
 
 	//match features between current left image and current right image
-	matcher.knnMatch(desc_current_l, desc_current_r, knn_matches_current, good_matches_current);
+	matcher.knnMatch(kp_current_l, kp_current_r, desc_current_l, desc_current_r, knn_matches_current, good_matches_current);
+	/*
+	drawMatches(img_current_l, kp_current_l, img_current_r, kp_current_r, good_matches_current, dst, Scalar::all(-1),
+		Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+	
+	for (int i = 0; i < good_matches_current.size(); i++)
+	{
+		DMatch match = good_matches_current[i];
+		Point3f p = calcWordlCoord(kp_current_l[match.queryIdx].pt, kp_current_r[match.trainIdx].pt, focal, baseline);
+		cout << "z:" << p.z << endl;
+	}
+
+	imshow("image", dst);
+	waitKey();
+	*/
 
 
 	while (frame_number < MAX_FRAME)
@@ -85,7 +99,7 @@ int main()
 		splitIntoTwo(img_next, img_next_l, img_next_r);
 
 		//track features from current left image to next left image
-		tracker.trackFeature(img_current_l, img_next_l, pts_current_l, pts_next_l, status, err);
+		tracker.trackFeature(img_current_l, img_next_l, pts_current_l, pts_next_l, status);
 
 		//calculate R, t
 		E = findEssentialMat(pts_next_l, pts_current_l, focal, pp, RANSAC, 0.999, 1.0, mask);
@@ -97,20 +111,22 @@ int main()
 		kp_next_l.clear();
 		for (int i = 0; i < pts_next_l.size(); i++)
 		{
-			kp_next_l.push_back(KeyPoint(pts_next_l[i], 1.f));
+			kp_next_l.emplace_back(KeyPoint(pts_next_l[i], 1.f));
 		}
 		detector->compute(img_next_l, kp_next_l, desc_next_l);
 		detector->detectAndCompute(img_next_r, noArray(), kp_next_r, desc_next_r);
 
 		//match features between next left image and next right image
-		matcher.knnMatch(desc_next_l, desc_next_r, knn_matches_next, good_matches_next);
+		matcher.knnMatch(kp_next_l, kp_next_r, desc_next_l, desc_next_r, knn_matches_next, good_matches_next);
 
 		drawMatches(img_next_l, kp_next_l, img_next_r, kp_next_r, good_matches_next, dst, Scalar::all(-1),
 			Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
 
+		imshow("image", dst);
+		waitKey();
+
 		//calculate
-		float sumOfDistance = 0.0f;
-		int correspondence = 0;
+		distances.clear();
 		for (int i = 0; i < good_matches_next.size(); i++)
 		{
 			DMatch match_next = good_matches_next[i];
@@ -125,14 +141,16 @@ int main()
 			//next point coordinate
 			Point3f p_next = calcWordlCoord(kp_next_l[match_next.queryIdx].pt, kp_next_r[match_next.trainIdx].pt, focal, baseline);
 
+			cout << "current z:" << p_current.z << ", next z: " << p_next.z << endl;
+
 			
-			//‚±‚ê‚ç‚©‚ç“_‚ÌŽOŽŸŒ³À•W‚ð‚à‚Æ‚ß‚Ä‹——£‚ð‹‚ß‚é
-			sumOfDistance += norm(p_next-p_current);
-			correspondence++;
+			distances.emplace_back(norm(p_next-p_current));
 		}
-		if (correspondence > 0)
+		if (distances.size() > 0)
 		{
-			absoluteDistance = sumOfDistance / correspondence;
+			//output median
+			nth_element(distances.begin(), distances.begin() + distances.size() / 2, distances.end());
+			absoluteDistance = distances[distances.size() / 2];
 		}
 
 		cout << absoluteDistance << endl;
@@ -143,8 +161,6 @@ int main()
 		knn_matches_current = move(knn_matches_next);
 		good_matches_current = move(good_matches_next);
 
-
-		imshow("image", dst);
 		waitKey();
 	}
 
