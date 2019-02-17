@@ -8,6 +8,8 @@ FeatureMatcher::FeatureMatcher(const float ratio_thresh)
 
 void FeatureMatcher::extractGoodMatches(Mat& desc1, Mat& desc2, vector<DMatch>& good_matches)
 {
+	good_matches.clear();
+
 	vector<vector<DMatch>> knn_matches;
 	matcher.knnMatch(desc1, desc2, knn_matches, 2);
 
@@ -22,6 +24,9 @@ void FeatureMatcher::extractGoodMatches(Mat& desc1, Mat& desc2, vector<DMatch>& 
 
 void FeatureMatcher::knnMatchStereo(vector<KeyPoint>& kp_l, vector<KeyPoint>& kp_r, Mat& desc_l, Mat& desc_r, vector<KeyPoint>& kp_good_l, vector<KeyPoint>& kp_good_r)
 {
+	kp_good_l.clear();
+	kp_good_r.clear();
+
 	vector<vector<DMatch>> knn_matches;
 	matcher.knnMatch(desc_l, desc_r, knn_matches, 2);
 
@@ -51,6 +56,4 @@ void FeatureMatcher::knnMatchStereo(vector<KeyPoint>& kp_l, vector<KeyPoint>& kp
 
 		indexCorrection++;
 	}
-
-	cout << "good_matches: " << kp_good_l.size() << endl;
 }
