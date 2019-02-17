@@ -14,5 +14,6 @@ private:
 
 public:
 	FeatureMatcher(const float ratio_thresh);
-	void knnMatch(vector<KeyPoint>& kp_l, vector<KeyPoint>& kp_r, Mat& desc_l, Mat& desc_r, vector<vector<DMatch>>& knn_matches, vector<DMatch>& good_matches);
+	void extractGoodMatches(Mat& desc1, Mat& desc2, vector<DMatch>& good_matches);
+	void knnMatchStereo(vector<KeyPoint>& kp_l, vector<KeyPoint>& kp_r, Mat& desc_l, Mat& desc_r, vector<KeyPoint>& kp_good_l, vector<KeyPoint>& kp_good_r);
 };
