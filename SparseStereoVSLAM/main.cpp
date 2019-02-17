@@ -42,12 +42,13 @@ int main()
 {
 	Mat img_current, img_current_l, img_current_r, img_next, img_next_l, img_next_r, dst;
 	vector<KeyPoint> kp_current_l, kp_current_r, kp_next_l, kp_next_r;
+	vector<KeyPoint> kp_current_good_l, kp_current_good_r, kp_next_good_l, kp_next_good_r;
 	Mat desc_current_l, desc_current_r, desc_next_l, desc_next_r;
 	int frame_number = 1;
 	Ptr<ORB> detector = ORB::create();
 
-	vector<DMatch> good_matches_current, good_matches_next;
-	vector<vector<DMatch>> knn_matches_current, knn_matches_next;
+	vector<DMatch> good_matches_current, good_matches_current_next, good_matches_next;
+	vector<vector<DMatch>> knn_matches_current, knn_matches_current_next, knn_matches_next;
 	const float ratio_thresh = 0.8f;
 	FeatureMatcher matcher = FeatureMatcher(ratio_thresh);
 
@@ -63,7 +64,6 @@ int main()
 	vector<double> distances;
 	double absoluteDistance = 0.0;
 
-
 	//preprocessing
 	img_current = imread(getFilePath(frame_number), IMREAD_GRAYSCALE);
     splitIntoTwo(img_current, img_current_l, img_current_r);
@@ -71,11 +71,11 @@ int main()
 	//find features from current image
 	detector->detectAndCompute(img_current_l, noArray(), kp_current_l, desc_current_l);
 	detector->detectAndCompute(img_current_r, noArray(), kp_current_r, desc_current_r);
-	KeyPoint::convert(kp_current_l, pts_current_l);
+	
 
 	//match features between current left image and current right image
-	matcher.knnMatch(kp_current_l, kp_current_r, desc_current_l, desc_current_r, knn_matches_current, good_matches_current);
-
+	matcher.knnMatchStereo(kp_current_l, kp_current_r, desc_current_l, desc_current_r, kp_current_good_l, kp_current_good_r);
+	
 
 	while (frame_number < MAX_FRAME)
 	{
@@ -84,8 +84,23 @@ int main()
 		img_next = imread(getFilePath(frame_number), IMREAD_GRAYSCALE);
 		splitIntoTwo(img_next, img_next_l, img_next_r);
 
-		//track features from current left image to next left image
-		tracker.trackFeature(img_current_l, img_next_l, pts_current_l, pts_next_l, status);
+		//nextで特徴量計算
+		detector->detectAndCompute(img_next_l, noArray(), kp_next_l, desc_next_l);
+		detector->detectAndCompute(img_next_r, noArray(), kp_next_r, desc_next_r);
+
+		matcher.knnMatchStereo(kp_next_l, kp_next_r, desc_next_l, desc_next_r, kp_next_good_l, kp_next_good_r);
+
+		//matcherでやったやつをgood_matchesのやつだけ違うvectorにいれればR, tはもとめられる
+		//current lとnext lでマッチング
+		matcher.extractGoodMatches(desc_current_l, desc_next_l, good_matches_current_next);
+
+		cout << "good_matches: " << good_matches_current_next.size() << endl;
+		for (int i = 0; i < good_matches_current_next.size(); i++)
+		{
+			DMatch match = good_matches_current_next[i];
+			pts_current_l.push_back(kp_current_good_l[match.queryIdx].pt);
+			pts_next_l.push_back(kp_next_good_l[match.trainIdx].pt);
+		}
 
 		//calculate R, t
 		E = findEssentialMat(pts_next_l, pts_current_l, focal, pp, RANSAC, 0.999, 1.0, mask);
@@ -93,17 +108,9 @@ int main()
 		cout << R << endl;
 		cout << t << endl;
 
-		//find features from next image
-		kp_next_l.clear();
-		for (int i = 0; i < pts_next_l.size(); i++)
-		{
-			kp_next_l.emplace_back(KeyPoint(pts_next_l[i], 1.f));
-		}
-		detector->compute(img_next_l, kp_next_l, desc_next_l);
-		detector->detectAndCompute(img_next_r, noArray(), kp_next_r, desc_next_r);
-
+		/*
 		//match features between next left image and next right image
-		matcher.knnMatch(kp_next_l, kp_next_r, desc_next_l, desc_next_r, knn_matches_next, good_matches_next);
+		matcher.knnMatch(kp_next_l, kp_next_r, desc_next_l, desc_next_r, good_matches_next);
 
 		drawMatches(img_next_l, kp_next_l, img_next_r, kp_next_r, good_matches_next, dst, Scalar::all(-1),
 			Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
@@ -141,13 +148,7 @@ int main()
 
 		cout << absoluteDistance << endl;
 		
-		//update
-		img_current_l = img_next_l;
-		pts_current_l = move(pts_next_l);
-		knn_matches_current = move(knn_matches_next);
-		good_matches_current = move(good_matches_next);
-
-		waitKey();
+		waitKey();*/
 	}
 
 	return 0;
