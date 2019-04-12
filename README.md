@@ -1,2 +1,2 @@
-# SparseStereoVSLAM
-Sparse stereo Visual SLAM
+# SparseStereoVisualOdometry
+Sparse stereo Visual Odometry
